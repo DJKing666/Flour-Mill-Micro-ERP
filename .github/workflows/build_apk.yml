@@ -1,0 +1,47 @@
+name: Build Flour Mill POS APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java Development Kit
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter Engine
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Clean Build Workspace
+        run: flutter clean
+
+      - name: Install Project Dependencies
+        run: flutter pub get
+
+      - name: Patch legacy jcenter in downloaded packages
+        run: find ~/.pub-cache/ -name "build.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
+
+      - name: Compile Release APK
+        run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
+
+      - name: Upload APK to GitHub Releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BUILD_TAG="pos-v1.0.${{ github.run_number }}-$(date +'%Y%m%d%H%M')"
+          
+          gh release create "$BUILD_TAG" build/app/outputs/flutter-apk/app-release.apk \
+            --title "MillFlow POS - v1.0.${{ github.run_number }}" \
+            --notes "Release build for Rugtek BP02 thermal printer integration. Compiled automatically via GitHub Actions."
