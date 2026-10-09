@@ -43,9 +43,9 @@ jobs:
           mkdir -p build/unified_esc_pos_printer/intermediates/aar_metadata_check/release/checkReleaseAarMetadata
           mkdir -p build/usb_serial/intermediates/aar_metadata_check/release/checkReleaseAarMetadata
 
-      # Added --no-pub and P-flag to skip linting tasks entirely during the native build phase
+      # Removed the invalid --build-arg flag. The mkdir step above handles the Gradle error.
       - name: Compile Release APK
-        run: flutter build apk --release --no-pub --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --build-arg=-PcheckReleaseAarMetadata=false
+        run: flutter build apk --release --no-pub --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
       - name: Upload APK to GitHub Releases
         env:
