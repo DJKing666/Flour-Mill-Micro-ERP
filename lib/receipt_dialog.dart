@@ -42,7 +42,7 @@ class ThermalReceiptDialog extends StatelessWidget {
           width: 320,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: Colors.white, // Hardcoded white to simulate paper
             borderRadius: BorderRadius.circular(4),
             boxShadow: const [
               BoxShadow(color: Colors.black26, blurRadius: 10, spreadRadius: 2),
@@ -55,15 +55,21 @@ class ThermalReceiptDialog extends StatelessWidget {
               children: [
                 const Text(
                   "MILLFLOW CHAKKI",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2),
+                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2),
                 ),
                 const Text(
                   "Fresh Flour & Grinding Depot",
-                  style: TextStyle(fontSize: 11, color: Colors.black54),
+                  style: TextStyle(color: Colors.black87, fontSize: 11),
                 ),
-                const Text("Belagavi, Karnataka | Ph: +91 9731974669", style: TextStyle(fontSize: 10)),
+                const Text(
+                  "Belagavi, Karnataka | Ph: +91 9731974669", 
+                  style: TextStyle(color: Colors.black, fontSize: 10)
+                ),
                 const SizedBox(height: 8),
-                const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
+                const Text(
+                  "------------------------------------------", 
+                  style: TextStyle(color: Colors.black, letterSpacing: -1)
+                ),
 
                 if (assignedMachine != null && assignedMachine!.isNotEmpty) ...[
                   Container(
@@ -72,49 +78,70 @@ class ThermalReceiptDialog extends StatelessWidget {
                     decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1.5)),
                     child: Text(
                       "QUEUE: ${assignedMachine!.toUpperCase()}",
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
+                  const Text(
+                    "------------------------------------------", 
+                    style: TextStyle(color: Colors.black, letterSpacing: -1)
+                  ),
                 ],
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Token: $orderId", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(
+                      "Token: $orderId", 
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)
+                    ),
                     Text(
                       "${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}",
-                      style: const TextStyle(fontSize: 11),
+                      style: const TextStyle(color: Colors.black, fontSize: 11),
                     ),
                   ],
                 ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("Cust: $customerName", style: const TextStyle(fontSize: 11)),
-                    Text("Ph: $customerPhone", style: const TextStyle(fontSize: 11)),
+                    Text("Cust: $customerName", style: const TextStyle(color: Colors.black, fontSize: 11)),
+                    Text("Ph: $customerPhone", style: const TextStyle(color: Colors.black, fontSize: 11)),
                   ],
                 ),
-                const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
+                const Text(
+                  "------------------------------------------", 
+                  style: TextStyle(color: Colors.black, letterSpacing: -1)
+                ),
 
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(orderDetails, style: const TextStyle(fontSize: 12, height: 1.3, fontFamily: 'monospace')),
+                  child: Text(
+                    orderDetails, 
+                    style: const TextStyle(color: Colors.black, fontSize: 12, height: 1.3, fontFamily: 'monospace')
+                  ),
                 ),
-                const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
+                const Text(
+                  "------------------------------------------", 
+                  style: TextStyle(color: Colors.black, letterSpacing: -1)
+                ),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("MODE: $paymentMode", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    Text(
+                      "MODE: $paymentMode", 
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)
+                    ),
                     Text(
                       "TOTAL: ₹${totalAmount.toStringAsFixed(2)}",
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 16),
                     ),
                   ],
                 ),
-                const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
+                const Text(
+                  "------------------------------------------", 
+                  style: TextStyle(color: Colors.black, letterSpacing: -1)
+                ),
 
                 if (paymentMode == "UPI") ...[
                   const SizedBox(height: 6),
@@ -124,23 +151,39 @@ class ThermalReceiptDialog extends StatelessWidget {
                     height: 140,
                     loadingBuilder: (_, child, progress) =>
                         progress == null ? child : const SizedBox(height: 140, child: Center(child: CircularProgressIndicator())),
-                    errorBuilder: (_, __, ___) => const Icon(Icons.qr_code, size: 80),
+                    errorBuilder: (_, __, ___) => const Icon(Icons.qr_code, color: Colors.black, size: 80),
                   ),
                   const SizedBox(height: 4),
-                  const Text("Scan to Pay via UPI", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  const Text(
+                    "Scan to Pay via UPI", 
+                    style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)
+                  ),
                   const SizedBox(height: 6),
-                  const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
+                  const Text(
+                    "------------------------------------------", 
+                    style: TextStyle(color: Colors.black, letterSpacing: -1)
+                  ),
                 ],
 
                 const SizedBox(height: 4),
-                const Text("Pure stone-ground goodness.", style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
-                const Text("*** THANK YOU! VISIT AGAIN ***", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Pure stone-ground goodness.", 
+                  style: TextStyle(color: Colors.black87, fontSize: 10, fontStyle: FontStyle.italic)
+                ),
+                const Text(
+                  "*** THANK YOU! VISIT AGAIN ***", 
+                  style: TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold)
+                ),
                 const SizedBox(height: 14),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.brown,
+                        side: const BorderSide(color: Colors.brown),
+                      ),
                       onPressed: () => Navigator.pop(context),
                       child: const Text("Close"),
                     ),

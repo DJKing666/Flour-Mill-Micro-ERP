@@ -6,7 +6,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'printer_dialog.dart';
 
 class PrinterService {
-  // Explicit runtime permissions matching Utsav OS
   static Future<bool> requestPermissions() async {
     if (kIsWeb) return false;
     final statuses = await [
@@ -18,7 +17,6 @@ class PrinterService {
     return statuses[Permission.bluetoothConnect]?.isGranted ?? true;
   }
 
-  // Print MillFlow receipt directly using unified_esc_pos_printer
   static Future<bool> printReceipt(
     BuildContext context, {
     required String orderId,
@@ -32,7 +30,6 @@ class PrinterService {
   }) async {
     if (kIsWeb) return false;
 
-    // 1. Enforce Bluetooth runtime permissions
     await requestPermissions();
 
     final prefs = await SharedPreferences.getInstance();
@@ -42,7 +39,6 @@ class PrinterService {
     final manager = PrinterManager();
     PrinterDevice? targetDevice;
 
-    // 2. Locate saved Rugtek BP02 printer
     if (savedMac != null && savedMac.isNotEmpty) {
       try {
         final printers = await manager.scanPrinters(timeout: const Duration(seconds: 3));
@@ -54,7 +50,6 @@ class PrinterService {
       }
     }
 
-    // 3. Fallback to bottom sheet selector if not yet linked
     if (targetDevice == null) {
       if (!context.mounted) return false;
       targetDevice = await CustomPrinterSelectorBottomSheet.show(context);
@@ -62,30 +57,30 @@ class PrinterService {
 
     if (targetDevice == null) {
       manager.dispose();
-      return false; // User cancelled selector
+      return false;
     }
 
-    // 4. Connect, format 58mm ticket, and print
     try {
       await manager.connect(targetDevice);
+      
+      // Allow connection to stabilize before sending bytes
+      await Future.delayed(const Duration(milliseconds: 500));
+
       final profile = await CapabilityProfile.load();
       final ticket = Ticket(PaperSize.mm58, profile);
 
-      // Mill Header (32 columns width)
       ticket.text('================================');
       ticket.text('        MILLFLOW CHAKKI         ');
       ticket.text('  Fresh Flour & Grinding Depot  ');
       ticket.text('    Belagavi | Ph: 9731974669   ');
       ticket.text('================================');
 
-      // Grinder Routing Callout
       if (assignedMachine != null && assignedMachine.isNotEmpty) {
         ticket.text('--------------------------------');
         ticket.text('QUEUE: ${assignedMachine.toUpperCase()}');
         ticket.text('--------------------------------');
       }
 
-      // Metadata
       final timeStr =
           '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}';
       ticket.text('Token: $orderId    $timeStr');
@@ -93,7 +88,6 @@ class PrinterService {
       ticket.text('Ph:   $customerPhone');
       ticket.text('--------------------------------');
 
-      // Line Items
       for (final line in orderDetails.split('\n')) {
         if (line.trim().isNotEmpty) {
           ticket.text(line.trim());
@@ -101,27 +95,29 @@ class PrinterService {
       }
       ticket.text('--------------------------------');
 
-      // Mode & Total
       ticket.text('MODE: $paymentMode');
       ticket.text('TOTAL: Rs ${totalAmount.toStringAsFixed(2)}');
       ticket.text('--------------------------------');
 
-      // Native Dynamic UPI QR Code
+      // CRITICAL FIX: Removed ticket.qrcode(upiString).
+      // Sending native hardware QR commands corrupts the BP02 buffer, causing a blank feed.
       if (paymentMode == 'UPI') {
-        final upiString =
-            'upi://pay?pa=9731974669@upi&pn=MillFlowDirect&am=${totalAmount.toStringAsFixed(2)}&cu=INR&tn=$orderId';
         ticket.text('      Scan to Pay via UPI       ');
-        ticket.qrcode(upiString);
+        ticket.text('     (Use QR on screen)         ');
         ticket.text('--------------------------------');
       }
 
-      // Footer & Tear Feed
       ticket.text(' *** THANK YOU! VISIT AGAIN *** ');
       ticket.emptyLines(feedLines);
       ticket.cut();
 
-      // Send to Rugtek BP02
+      // Send bytes to printer
       await manager.printTicket(ticket);
+      
+      // CRITICAL FIX: Allow RFCOMM buffer to fully flush to the printer before severing the connection.
+      // Without this, the socket closes while bytes are still in transit.
+      await Future.delayed(const Duration(seconds: 2));
+      
       await manager.disconnect();
       manager.dispose();
       return true;
