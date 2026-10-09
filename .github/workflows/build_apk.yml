@@ -33,6 +33,12 @@ jobs:
       - name: Patch legacy jcenter in downloaded packages
         run: find ~/.pub-cache/ -name "build.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
 
+      # Dynamically updates legacy packages (like usb_serial) to compile against Android SDK 34
+      - name: Patch legacy compileSdkVersion in downloaded packages
+        run: |
+          find ~/.pub-cache/ -name "build.gradle" -exec sed -i -E 's/compileSdkVersion [0-9]+/compileSdkVersion 34/g' {} +
+          find ~/.pub-cache/ -name "build.gradle" -exec sed -i -E 's/compileSdk [0-9]+/compileSdk 34/g' {} +
+
       - name: Compile Release APK
         run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
 
