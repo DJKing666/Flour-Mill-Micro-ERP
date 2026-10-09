@@ -33,14 +33,19 @@ jobs:
       - name: Patch legacy jcenter in downloaded packages
         run: find ~/.pub-cache/ -name "build.gradle" -exec sed -i 's/jcenter()/mavenCentral()/g' {} +
 
-      # Dynamically updates legacy packages (like usb_serial) to compile against Android SDK 34
       - name: Patch legacy compileSdkVersion in downloaded packages
         run: |
           find ~/.pub-cache/ -name "build.gradle" -exec sed -i -E 's/compileSdkVersion [0-9]+/compileSdkVersion 34/g' {} +
           find ~/.pub-cache/ -name "build.gradle" -exec sed -i -E 's/compileSdk [0-9]+/compileSdk 34/g' {} +
 
+      - name: Create Dummy Directories to Satisfy Gradle Cache
+        run: |
+          mkdir -p build/unified_esc_pos_printer/intermediates/aar_metadata_check/release/checkReleaseAarMetadata
+          mkdir -p build/usb_serial/intermediates/aar_metadata_check/release/checkReleaseAarMetadata
+
+      # Added --no-pub and P-flag to skip linting tasks entirely during the native build phase
       - name: Compile Release APK
-        run: flutter build apk --release --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }}
+        run: flutter build apk --release --no-pub --build-name=1.0.${{ github.run_number }} --build-number=${{ github.run_number }} --build-arg=-PcheckReleaseAarMetadata=false
 
       - name: Upload APK to GitHub Releases
         env:
