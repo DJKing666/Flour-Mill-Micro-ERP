@@ -1,60 +1,26 @@
 import 'package:flutter/foundation.dart';
-import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
-import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:unified_esc_pos_printer/unified_esc_pos_printer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'printer_dialog.dart';
 
 class PrinterService {
-  // Check if Bluetooth is turned on and permitted
-  static Future<bool> isBluetoothReady() async {
+  // Explicit runtime permissions matching Utsav OS
+  static Future<bool> requestPermissions() async {
     if (kIsWeb) return false;
-    try {
-      final bool enabled = await PrintBluetoothThermal.bluetoothEnabled;
-      return enabled;
-    } catch (_) {
-      return false;
-    }
+    final statuses = await [
+      Permission.bluetooth,
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+    await Future.delayed(const Duration(milliseconds: 300));
+    return statuses[Permission.bluetoothConnect]?.isGranted ?? true;
   }
 
-  // Check connection status
-  static Future<bool> isConnected() async {
-    if (kIsWeb) return false;
-    try {
-      return await PrintBluetoothThermal.connectionStatus;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  // Get paired Bluetooth devices with safety timeout
-  static Future<List<BluetoothInfo>> getPairedDevices() async {
-    if (kIsWeb) return [];
-    try {
-      return await PrintBluetoothThermal.pairedBluetooths
-          .timeout(const Duration(seconds: 4), onTimeout: () => []);
-    } catch (e) {
-      print('Error getting devices: $e');
-      return [];
-    }
-  }
-
-  // Connect to Rugtek BP02 with stabilization delay
-  static Future<bool> connectPrinter(String macAddress) async {
-    if (kIsWeb) return false;
-    try {
-      final connected = await PrintBluetoothThermal.connect(macPrinterAddress: macAddress)
-          .timeout(const Duration(seconds: 6), onTimeout: () => false);
-      if (connected) {
-        // Small delay to allow the RFCOMM serial socket to stabilize
-        await Future.delayed(const Duration(milliseconds: 300));
-      }
-      return connected;
-    } catch (e) {
-      print('Error connecting: $e');
-      return false;
-    }
-  }
-
-  // Generate 58mm ESC/POS byte buffer and print
-  static Future<bool> printReceipt({
+  // Print MillFlow receipt directly using unified_esc_pos_printer
+  static Future<bool> printReceipt(
+    BuildContext context, {
     required String orderId,
     required String customerName,
     required String customerPhone,
@@ -66,91 +32,105 @@ class PrinterService {
   }) async {
     if (kIsWeb) return false;
 
+    // 1. Enforce Bluetooth runtime permissions
+    await requestPermissions();
+
+    final prefs = await SharedPreferences.getInstance();
+    String? savedMac = prefs.getString('saved_printer_mac');
+    final int feedLines = prefs.getInt('printer_feed_lines') ?? 2;
+
+    final manager = PrinterManager();
+    PrinterDevice? targetDevice;
+
+    // 2. Locate saved Rugtek BP02 printer
+    if (savedMac != null && savedMac.isNotEmpty) {
+      try {
+        final printers = await manager.scanPrinters(timeout: const Duration(seconds: 3));
+        targetDevice = printers.firstWhere(
+          (p) => (p as dynamic).address?.toString() == savedMac,
+        );
+      } catch (_) {
+        targetDevice = null;
+      }
+    }
+
+    // 3. Fallback to bottom sheet selector if not yet linked
+    if (targetDevice == null) {
+      if (!context.mounted) return false;
+      targetDevice = await CustomPrinterSelectorBottomSheet.show(context);
+    }
+
+    if (targetDevice == null) {
+      manager.dispose();
+      return false; // User cancelled selector
+    }
+
+    // 4. Connect, format 58mm ticket, and print
     try {
-      final bool connected = await PrintBluetoothThermal.connectionStatus;
-      if (!connected) return false;
-
+      await manager.connect(targetDevice);
       final profile = await CapabilityProfile.load();
-      final generator = Generator(PaperSize.mm58, profile);
-      List<int> bytes = [];
+      final ticket = Ticket(PaperSize.mm58, profile);
 
-      // 1. Mill Header
-      bytes += generator.text(
-        'MILLFLOW CHAKKI',
-        styles: const PosStyles(
-          align: PosAlign.center,
-          height: PosTextSize.size2,
-          width: PosTextSize.size2,
-          bold: true,
-        ),
-      );
-      bytes += generator.text('Fresh Flour & Grinding Depot', styles: const PosStyles(align: PosAlign.center));
-      bytes += generator.text('Belagavi | Ph: 9731974669', styles: const PosStyles(align: PosAlign.center));
-      bytes += generator.hr();
+      // Mill Header (32 columns width)
+      ticket.text('================================');
+      ticket.text('        MILLFLOW CHAKKI         ');
+      ticket.text('  Fresh Flour & Grinding Depot  ');
+      ticket.text('    Belagavi | Ph: 9731974669   ');
+      ticket.text('================================');
 
-      // 2. Machine Routing Callout (Clean border compatible with Rugtek BP02)
+      // Grinder Routing Callout
       if (assignedMachine != null && assignedMachine.isNotEmpty) {
-        bytes += generator.text(
-          '================================',
-          styles: const PosStyles(align: PosAlign.center),
-        );
-        bytes += generator.text(
-          'QUEUE: ${assignedMachine.toUpperCase()}',
-          styles: const PosStyles(align: PosAlign.center, bold: true),
-        );
-        bytes += generator.text(
-          '================================',
-          styles: const PosStyles(align: PosAlign.center),
-        );
+        ticket.text('--------------------------------');
+        ticket.text('QUEUE: ${assignedMachine.toUpperCase()}');
+        ticket.text('--------------------------------');
       }
 
-      // 3. Metadata
-      bytes += generator.row([
-        PosColumn(text: 'Token: $orderId', width: 7, styles: const PosStyles(bold: true)),
-        PosColumn(
-          text: '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-          width: 5,
-          styles: const PosStyles(align: PosAlign.right),
-        ),
-      ]);
-      bytes += generator.text('Cust: $customerName ($customerPhone)');
-      bytes += generator.hr();
+      // Metadata
+      final timeStr =
+          '${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}';
+      ticket.text('Token: $orderId    $timeStr');
+      ticket.text('Cust: $customerName');
+      ticket.text('Ph:   $customerPhone');
+      ticket.text('--------------------------------');
 
-      // 4. Line Items
+      // Line Items
       for (final line in orderDetails.split('\n')) {
         if (line.trim().isNotEmpty) {
-          bytes += generator.text(line.trim(), styles: const PosStyles(fontType: PosFontType.fontB));
+          ticket.text(line.trim());
         }
       }
-      bytes += generator.hr();
+      ticket.text('--------------------------------');
 
-      // 5. Total
-      bytes += generator.row([
-        PosColumn(text: 'MODE: $paymentMode', width: 6, styles: const PosStyles(bold: true)),
-        PosColumn(
-          text: 'Rs ${totalAmount.toStringAsFixed(2)}',
-          width: 6,
-          styles: const PosStyles(align: PosAlign.right, bold: true, width: PosTextSize.size2),
-        ),
-      ]);
-      bytes += generator.hr();
+      // Mode & Total
+      ticket.text('MODE: $paymentMode');
+      ticket.text('TOTAL: Rs ${totalAmount.toStringAsFixed(2)}');
+      ticket.text('--------------------------------');
 
-      // 6. Dynamic UPI QR
+      // Native Dynamic UPI QR Code
       if (paymentMode == 'UPI') {
         final upiString =
             'upi://pay?pa=9731974669@upi&pn=MillFlowDirect&am=${totalAmount.toStringAsFixed(2)}&cu=INR&tn=$orderId';
-        bytes += generator.text('Scan to Pay via UPI', styles: const PosStyles(align: PosAlign.center, bold: true));
-        bytes += generator.qrcode(upiString, size: QRSize.size4);
-        bytes += generator.hr();
+        ticket.text('      Scan to Pay via UPI       ');
+        ticket.qrcode(upiString);
+        ticket.text('--------------------------------');
       }
 
-      // 7. Footer & Paper Feed (Feeds paper past the manual tear bar)
-      bytes += generator.text('*** THANK YOU! VISIT AGAIN ***', styles: const PosStyles(align: PosAlign.center, bold: true));
-      bytes += generator.feed(3);
+      // Footer & Tear Feed
+      ticket.text(' *** THANK YOU! VISIT AGAIN *** ');
+      ticket.emptyLines(feedLines);
+      ticket.cut();
 
-      return await PrintBluetoothThermal.writeBytes(bytes);
+      // Send to Rugtek BP02
+      await manager.printTicket(ticket);
+      await manager.disconnect();
+      manager.dispose();
+      return true;
     } catch (e) {
-      print('Print execution error: $e');
+      print('Print error: $e');
+      try {
+        await manager.disconnect();
+        manager.dispose();
+      } catch (_) {}
       return false;
     }
   }

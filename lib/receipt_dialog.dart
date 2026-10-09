@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'printer_service.dart';
-import 'printer_dialog.dart';
 
 class ThermalReceiptDialog extends StatelessWidget {
   final String orderId;
@@ -27,7 +26,6 @@ class ThermalReceiptDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Registered UPI ID for dynamic QR generation
     const merchantUpiId = "9731974669@upi";
     const merchantName = "MillFlow Direct";
 
@@ -41,7 +39,7 @@ class ThermalReceiptDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Center(
         child: Container(
-          width: 320, // Standard 58mm / 80mm thermal paper scale
+          width: 320,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -55,7 +53,6 @@ class ThermalReceiptDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1. Mill Header
                 const Text(
                   "MILLFLOW CHAKKI",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2),
@@ -68,14 +65,11 @@ class ThermalReceiptDialog extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
 
-                // 2. Machine Routing Callout (Crucial for Grinder Operators)
                 if (assignedMachine != null && assignedMachine!.isNotEmpty) ...[
                   Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.black, width: 1.5),
-                    ),
+                    decoration: BoxDecoration(border: Border.all(color: Colors.black, width: 1.5)),
                     child: Text(
                       "QUEUE: ${assignedMachine!.toUpperCase()}",
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
@@ -85,7 +79,6 @@ class ThermalReceiptDialog extends StatelessWidget {
                   const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
                 ],
 
-                // 3. Order Metadata
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -105,17 +98,12 @@ class ThermalReceiptDialog extends StatelessWidget {
                 ),
                 const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
 
-                // 4. Line Items
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    orderDetails,
-                    style: const TextStyle(fontSize: 12, height: 1.3, fontFamily: 'monospace'),
-                  ),
+                  child: Text(orderDetails, style: const TextStyle(fontSize: 12, height: 1.3, fontFamily: 'monospace')),
                 ),
                 const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
 
-                // 5. Total & Payment Mode
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -128,7 +116,6 @@ class ThermalReceiptDialog extends StatelessWidget {
                 ),
                 const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
 
-                // 6. Dynamic UPI QR Code (Scannable from counter slip)
                 if (paymentMode == "UPI") ...[
                   const SizedBox(height: 6),
                   Image.network(
@@ -145,14 +132,11 @@ class ThermalReceiptDialog extends StatelessWidget {
                   const Text("------------------------------------------", style: TextStyle(letterSpacing: -1)),
                 ],
 
-                // 7. Footer
                 const SizedBox(height: 4),
                 const Text("Pure stone-ground goodness.", style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
                 const Text("*** THANK YOU! VISIT AGAIN ***", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-
                 const SizedBox(height: 14),
 
-                // Dialog Action Buttons
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -177,19 +161,8 @@ class ThermalReceiptDialog extends StatelessWidget {
                           return;
                         }
 
-                        // Check Bluetooth printer connection status
-                        bool connected = await PrinterService.isConnected();
-                        if (!connected) {
-                          if (!context.mounted) return;
-                          final res = await showDialog<bool>(
-                            context: context,
-                            builder: (_) => const PrinterSelectDialog(),
-                          );
-                          if (res != true) return;
-                        }
-
-                        // Send ESC/POS byte stream to Rugtek BP02
                         final printSuccess = await PrinterService.printReceipt(
+                          context,
                           orderId: orderId,
                           customerName: customerName,
                           customerPhone: customerPhone,
@@ -207,7 +180,8 @@ class ThermalReceiptDialog extends StatelessWidget {
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Print failed. Ensure BP02 has paper and is turned on.'),
+                              content: Text('Print failed or cancelled. Ensure BP02 is ON and in range.'),
+                              backgroundColor: Colors.red,
                             ),
                           );
                         }
