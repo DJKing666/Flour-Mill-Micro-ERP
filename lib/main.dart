@@ -15,8 +15,14 @@ class FlourMillPOSApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flour Mill Micro-ERP',
+      // Automatically switches based on Android System settings
+      themeMode: ThemeMode.system, 
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown, brightness: Brightness.light),
+        useMaterial3: true,
+      ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.brown, brightness: Brightness.dark),
         useMaterial3: true,
       ),
       home: const MerchantPOSScreen(),
@@ -145,6 +151,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
       paymentMode: selectedMode,
     );
 
+    if (!mounted) return;
     Navigator.pop(context); // Close loading indicator
 
     if (res['success'] == true) {
@@ -184,6 +191,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
     );
 
     final success = await ApiService.verifyPayment(orderId);
+    if (!mounted) return;
     Navigator.pop(context);
 
     if (success) {
@@ -200,10 +208,13 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('MillFlow Micro-ERP | Counter POS'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: colorScheme.inversePrimary,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -229,7 +240,8 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
             flex: 6,
             child: Container(
               padding: const EdgeInsets.all(16.0),
-              color: Colors.grey.shade50,
+              // Use theme-aware surface color instead of hardcoded grey
+              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -252,7 +264,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                         ? _buildJobWorkSection()
                         : activeModeIndex == 1
                             ? _buildRetailSection()
-                            : _buildWebOrdersSection(),
+                            : _buildWebOrdersSection(isDark),
                   ),
                 ],
               ),
@@ -292,7 +304,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                   const SizedBox(height: 12),
                   Expanded(
                     child: cart.isEmpty
-                        ? const Center(child: Text('No items in current counter bill.'))
+                        ? Center(child: Text('No items in current counter bill.', style: TextStyle(color: colorScheme.onSurfaceVariant)))
                         : ListView.separated(
                             itemCount: cart.length,
                             separatorBuilder: (_, __) => const Divider(height: 1),
@@ -311,7 +323,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                                   children: [
                                     Text('₹${item.totalPrice.toStringAsFixed(1)}'),
                                     IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                      icon: Icon(Icons.delete_outline, color: colorScheme.error),
                                       onPressed: () => setState(() => cart.removeAt(idx)),
                                     ),
                                   ],
@@ -322,21 +334,23 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                   ),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.brown.shade50, borderRadius: BorderRadius.circular(8)),
+                    // Theme-aware primary container for the total section
+                    decoration: BoxDecoration(color: colorScheme.primaryContainer, borderRadius: BorderRadius.circular(8)),
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Total Payable:', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            Text('Total Payable:', 
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer)),
                             Text('₹${totalBillAmount.toStringAsFixed(2)}',
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.brown)),
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: colorScheme.primary)),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Text('Payment: '),
+                            Text('Payment: ', style: TextStyle(color: colorScheme.onPrimaryContainer)),
                             const SizedBox(width: 8),
                             ChoiceChip(
                               label: const Text('Cash'),
@@ -356,7 +370,10 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                           width: double.infinity,
                           height: 48,
                           child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.brown, foregroundColor: Colors.white),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary, 
+                              foregroundColor: colorScheme.onPrimary
+                            ),
                             icon: const Icon(Icons.receipt_long),
                             label: const Text('PUNCH & QUEUE ORDER', style: TextStyle(fontWeight: FontWeight.bold)),
                             onPressed: _processCheckout,
@@ -375,19 +392,19 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
   }
 
   // Incoming Web Orders Queue with UTR Verification and Slip Preview
-  Widget _buildWebOrdersSection() {
+  Widget _buildWebOrdersSection(bool isDark) {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
     if (incomingWebOrders.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
-            SizedBox(height: 8),
-            Text('No pending web orders found in queue.', style: TextStyle(color: Colors.grey)),
+            Icon(Icons.inbox_outlined, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(height: 8),
+            Text('No pending web orders found in queue.', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       );
@@ -400,6 +417,13 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
         final utr = order['upiUtr']?.toString() ?? "";
         final paymentStatus = order['paymentStatus']?.toString() ?? "Pending";
         final totalAmt = (order['totalAmount'] as num?)?.toDouble() ?? 0.0;
+        final colorScheme = Theme.of(context).colorScheme;
+
+        // Dynamic status colors mapped for light/dark themes
+        final successBg = isDark ? Colors.green.withOpacity(0.2) : Colors.green.shade50;
+        final successText = isDark ? Colors.greenAccent : Colors.green.shade800;
+        final pendingBg = isDark ? Colors.amber.withOpacity(0.2) : Colors.amber.shade50;
+        final pendingText = isDark ? Colors.amberAccent : Colors.amber.shade900;
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
@@ -415,12 +439,12 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                   children: [
                     Text('${order['orderId']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     Text('₹$totalAmt',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.brown)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colorScheme.primary)),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text('Customer: ${order['customerName']} (${order['customerPhone']})'),
-                Text('Address: ${order['deliveryAddress']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                Text('Address: ${order['deliveryAddress']}', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13)),
                 Text('Items: ${order['orderDetails']}', style: const TextStyle(fontWeight: FontWeight.w500)),
                 const Divider(height: 20),
                 Row(
@@ -428,10 +452,10 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: paymentStatus == 'Success' ? Colors.green.shade50 : Colors.amber.shade50,
+                        color: paymentStatus == 'Success' ? successBg : pendingBg,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: paymentStatus == 'Success' ? Colors.green : Colors.amber.shade800,
+                          color: paymentStatus == 'Success' ? successText : pendingText,
                         ),
                       ),
                       child: Text(
@@ -439,7 +463,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: paymentStatus == 'Success' ? Colors.green.shade800 : Colors.amber.shade900,
+                          color: paymentStatus == 'Success' ? successText : pendingText,
                         ),
                       ),
                     ),
@@ -450,12 +474,12 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: utr.isNotEmpty ? Colors.blue.shade900 : Colors.grey,
+                          color: utr.isNotEmpty ? (isDark ? Colors.blue.shade200 : Colors.blue.shade900) : colorScheme.outline,
                         ),
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.print, color: Colors.brown),
+                      icon: Icon(Icons.print, color: colorScheme.primary),
                       tooltip: 'Preview Packing Slip',
                       onPressed: () {
                         showDialog(
@@ -500,7 +524,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
   Widget _buildJobWorkSection() {
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(side: BorderSide(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(8)),
+      shape: RoundedRectangleBorder(side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant), borderRadius: BorderRadius.circular(8)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -554,6 +578,7 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
   Widget _buildRetailSection() {
     if (isLoading) return const Center(child: CircularProgressIndicator());
     final retailItems = catalog.where((i) => i.category == 'Flour_Sales').toList();
+    final colorScheme = Theme.of(context).colorScheme;
 
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -574,8 +599,8 @@ class _MerchantPOSScreenState extends State<MerchantPOSScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(item.itemName, maxLines: 2, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('₹${item.pricePerKg} / kg', style: const TextStyle(color: Colors.brown, fontWeight: FontWeight.bold)),
-                Text('Stock: ${item.stockAvailableKg} kg', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('₹${item.pricePerKg} / kg', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold)),
+                Text('Stock: ${item.stockAvailableKg} kg', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                 Row(
                   children: [
                     Expanded(
